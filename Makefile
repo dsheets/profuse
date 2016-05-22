@@ -38,7 +38,6 @@ INSTALL:=$(addprefix profuse_7_8, $(TYPES)) \
          $(foreach versioned,$(addprefix $(MOD_NAME), $(VERSIONS)),\
              $(addprefix $(versioned), $(TYPES)))\
          $(addprefix fuse, $(TYPES)) \
-         $(addprefix handles, $(TYPES)) \
          $(addprefix nodes, $(TYPES)) \
          $(addprefix $(MOD_NAME)_, $(TARGETS))
 

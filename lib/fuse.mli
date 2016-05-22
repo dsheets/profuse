@@ -1,8 +1,6 @@
 
 module Profuse = Profuse_7_23
 
-module Handles = Handles
-
 module Nodes = Nodes
 
 type 'a structure = 'a Ctypes_static.structure
