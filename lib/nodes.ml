@@ -311,7 +311,11 @@ module Make(N : NODE) = struct
       match node.parent with
       | None -> ()
       | Some parent ->
-        let parent = Hashtbl.find table parent in
-        Hashtbl.remove parent.children node.name
+        try
+          let parent = Hashtbl.find table parent in
+          Hashtbl.remove parent.children node.name
+        with Not_found ->
+          Printf.eprintf "%Ld lookups %d, forget parent %Ld lookup fail\n%!"
+            node.id lookups parent
     end
 end
