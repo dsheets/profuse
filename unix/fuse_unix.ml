@@ -85,6 +85,8 @@ module IO(IO : BASE_IO)(Socket : SOCKET with type 'a io = 'a IO.t)
           | exn -> fail exn
         )
 
+    let read_notify chan () = Socket.read_notify chan
+
   end
 
   module Out = struct
@@ -111,6 +113,8 @@ module IO(IO : BASE_IO)(Socket : SOCKET with type 'a io = 'a IO.t)
             failwith (Printf.sprintf "errno for %s and EIO unknown" errstr)
       in
       write_reply req (Out.Hdr.packet ~nerrno ~count:0)
+
+    let write_notify = Socket.write_notify
   end
 end
 

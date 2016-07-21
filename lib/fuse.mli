@@ -52,6 +52,10 @@ module type SOCKET = sig
     ?nread:(unit -> Unsigned.uint32 io) ->
     unit -> unit
 
+  val read_notify : Profuse.chan -> Errno.t list io
+
+  val write_notify : Profuse.chan -> char Ctypes.CArray.t -> unit io
+
   val write_reply_raw :
     _ Profuse.request -> int -> char Ctypes.ptr -> unit io
 end
@@ -61,6 +65,7 @@ module type IO = sig
 
   module In : sig
     val read : Profuse.chan -> unit -> request t
+    val read_notify : Profuse.chan -> unit -> Errno.t list t
   end
 
   module Out : sig
@@ -71,6 +76,8 @@ module type IO = sig
     val write_ack : request -> unit t
 
     val write_error : (string -> unit) -> request -> Errno.t -> unit t
+
+    val write_notify : Profuse.chan -> char Ctypes.CArray.t -> unit t
   end
 end
 
