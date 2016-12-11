@@ -7,7 +7,7 @@ module type IO_LWT = Fuse.IO with type 'a t = 'a Lwt.t
 
 module type FS_IO_LWT = Fuse.FS_IO with type 'a IO.t = 'a Lwt.t
 
-module IO = Fuse.IO(Lwt)
+module IO = Fuse_unix.IO(Lwt)
 
 module type FS_LWT = Fuse.FS with module Calls.IO = IO
 

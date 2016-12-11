@@ -223,7 +223,3 @@ module Socket(IO : BASE_IO) : sig
   val write_reply_raw :
     _ Profuse.request -> int -> char Ctypes.ptr -> unit IO.t
 end
-
-module IO(IO : BASE_IO) : IO with type 'a t = 'a IO.t
-
-module Dispatch(F : FS) : FS with type t = F.t

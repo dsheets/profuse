@@ -7,20 +7,20 @@ archive(native) = "profuse_.cmxa"
 archive(native, plugin) = "profuse_.cmxs"
 exists_if = "profuse_.cma"
 
+package "unix" (
+  requires = "profuse ctypes unix-errno"
+  archive(byte) = "profuse_unix.cma"
+  archive(byte, plugin) = "profuse_unix.cma"
+  archive(native) = "profuse_unix.cmxa"
+  archive(native, plugin) = "profuse_unix.cmxs"
+  exists_if = "profuse_unix.cma"
+)
+
 package "lwt" (
-  requires = "profuse lwt.unix unix-errno.unix"
+  requires = "profuse profuse.unix lwt.unix"
   archive(byte) = "profuse_lwt.cma"
   archive(byte, plugin) = "profuse_lwt.cma"
   archive(native) = "profuse_lwt.cmxa"
   archive(native, plugin) = "profuse_lwt.cmxs"
   exists_if = "profuse_lwt.cma"
-)
-
-package "linux" (
-  requires = "profuse lwt"
-  archive(byte) = "profuse_linux.cma"
-  archive(byte, plugin) = "profuse_linux.cma"
-  archive(native) = "profuse_linux.cmxa"
-  archive(native, plugin) = "profuse_linux.cmxs"
-  exists_if = "profuse_linux.cma"
 )

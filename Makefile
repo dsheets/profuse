@@ -10,6 +10,8 @@ CTYPES_LIB_DIR=$(shell ocamlfind query ctypes)
 OCAMLBUILD=CTYPES_LIB_DIR=$(CTYPES_LIB_DIR) OCAML_LIB_DIR=$(OCAML_LIB_DIR) \
 	ocamlbuild -use-ocamlfind -classic-display
 
+WITH_UNIX=$(shell ocamlfind query unix > /dev/null 2>&1 ; echo $$?)
+
 WITH_LWT=$(shell ocamlfind query lwt > /dev/null 2>&1 ; echo $$?)
 
 WITH_CMDLINER=$(shell ocamlfind query cmdliner > /dev/null 2>&1 ; echo $$?)
@@ -20,6 +22,10 @@ PRODUCTS=$(addprefix $(MOD_NAME)_,$(TARGETS)) \
 
 #         $(addprefix $(MOD_NAME)_linux,$(TARGETS))
 #	lib$(MOD_NAME)_stubs.a dll$(MOD_NAME)_stubs.so
+
+ifeq ($(WITH_UNIX), 0)
+PRODUCTS+=$(addprefix $(MOD_NAME)_unix,$(TARGETS))
+endif
 
 ifeq ($(WITH_LWT), 0)
 PRODUCTS+=$(addprefix $(MOD_NAME)_lwt,$(TARGETS))
@@ -42,6 +48,15 @@ INSTALL:=$(addprefix $(MOD_NAME), $(TYPES)) \
 
 INSTALL:=$(addprefix _build/lib/,$(INSTALL))
 
+ifeq ($(WITH_UNIX), 0)
+INSTALL_UNIX:=$(addprefix fuse_unix,$(TYPES)) \
+              $(addprefix $(MOD_NAME)_unix,$(TARGETS))
+
+INSTALL_UNIX:=$(addprefix _build/unix/,$(INSTALL_UNIX))
+
+INSTALL+=$(INSTALL_UNIX)
+endif
+
 ifeq ($(WITH_LWT), 0)
 INSTALL_LWT:=$(addprefix fuse_lwt,$(TYPES)) \
              $(addprefix $(MOD_NAME)_lwt,$(TARGETS))
@@ -52,6 +67,10 @@ INSTALL+=$(INSTALL_LWT)
 endif
 
 ARCHIVES:=_build/lib/$(MOD_NAME)_.a
+
+ifeq ($(WITH_UNIX), 0)
+ARCHIVES+=_build/unix/$(MOD_NAME)_unix.a
+endif
 
 ifeq ($(WITH_LWT), 0)
 ARCHIVES+=_build/lwt/$(MOD_NAME)_lwt.a
