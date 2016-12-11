@@ -19,43 +19,6 @@ end
 
 module Socket = Fuse.Socket(Lwt)
 
-let write_notify chan arr =
-  let sz = CArray.length arr + Out.Hdr.sz in
-  let ptr = CArray.start arr -@ Out.Hdr.sz in
-  let socket = Socket.get chan.Profuse.id in
-  Socket.nwrite socket (coerce (Ctypes.ptr char) (Ctypes.ptr uint8_t) ptr) sz
-  >>= fun len ->
-  if sz <> len
-  then
-    let msg =
-      Printf.sprintf "Tried to write notify %d but only wrote %d" sz len
-    in
-    fail (Profuse.ProtocolError (chan,msg))
-  else return_unit
-
-let read_notify chan =
-  let socket = Socket.get chan.Profuse.id in
-  Socket.nread socket
-  >>= fun err ->
-  if UInt32.(compare zero err) = 0
-  then Lwt.return []
-  else
-    let host = chan.host.Host.errno in
-    let errno = Signed.SInt.of_int64 (UInt32.to_int64 err) in
-    Lwt.return (Errno.of_code ~host errno)
-
-let write_reply_raw req sz ptr =
-  let socket = Socket.get req.chan.id in
-  Socket.write socket (coerce (Ctypes.ptr char) (Ctypes.ptr uint8_t) ptr) sz
-  >>= fun len ->
-  if sz <> len
-  then
-    let msg =
-      Printf.sprintf "Tried to write %d but only wrote %d" sz len
-    in
-    fail (Profuse.ProtocolError (req.chan,msg))
-  else return_unit
-
 module IO : IO_LWT = struct
   type 'a t = 'a Lwt.t
 
@@ -140,7 +103,7 @@ module IO : IO_LWT = struct
       let arr = arrfn req in
       let sz  = CArray.length arr + Out.Hdr.sz in
       let ptr = CArray.start arr -@ Out.Hdr.sz in
-      write_reply_raw req sz ptr
+      Socket.write_reply_raw req sz ptr
 
     let write_ack req = write_reply req (Out.Hdr.packet ~count:0)
 
@@ -188,7 +151,7 @@ module Trace(F : FS_LWT) : FS_LWT with type t = F.t = struct
           Printf.eprintf "    returning %s from %Ld\n%!"
             Out.Message.(describe (deserialize req sz ptr))
             (UInt64.to_int64 (getf req.hdr Profuse.In.Hdr.T.unique));
-          write_reply_raw req sz ptr
+          Socket.write_reply_raw req sz ptr
 
         let write_ack req =
           Printf.eprintf "    returning ack from %Ld\n%!"

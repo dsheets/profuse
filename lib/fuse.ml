@@ -374,4 +374,47 @@ module Socket(IO : BASE_IO) = struct
           | Some nread -> nread
         );
       }
+
+  open Ctypes
+  open Profuse
+
+  let write_notify chan arr = IO.(
+    let sz = CArray.length arr + Out.Hdr.sz in
+    let ptr = CArray.start arr -@ Out.Hdr.sz in
+    let socket = get chan.Profuse.id in
+    nwrite socket (coerce (Ctypes.ptr char) (Ctypes.ptr uint8_t) ptr) sz
+    >>= fun len ->
+    if sz <> len
+    then
+      let msg =
+        Printf.sprintf "Tried to write notify %d but only wrote %d" sz len
+      in
+      fail (Profuse.ProtocolError (chan,msg))
+    else return ()
+  )
+
+  let read_notify chan = IO.(
+    let socket = get chan.Profuse.id in
+    nread socket
+    >>= fun err ->
+    if UInt32.(compare zero err) = 0
+    then return []
+    else
+      let host = chan.host.Host.errno in
+      let errno = Signed.SInt.of_int64 (UInt32.to_int64 err) in
+      return (Errno.of_code ~host errno)
+  )
+
+  let write_reply_raw req sz ptr = IO.(
+    let socket = get req.chan.id in
+    write socket (coerce (Ctypes.ptr char) (Ctypes.ptr uint8_t) ptr) sz
+    >>= fun len ->
+    if sz <> len
+    then
+      let msg =
+        Printf.sprintf "Tried to write %d but only wrote %d" sz len
+      in
+      fail (Profuse.ProtocolError (req.chan,msg))
+    else return ()
+  )
 end

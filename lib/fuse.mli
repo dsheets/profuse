@@ -217,4 +217,6 @@ module Socket(IO : BASE_IO) : sig
     ?nread:(unit -> Unsigned.uint32 IO.t) ->
     unit -> unit
 
+  val write_reply_raw :
+    _ Profuse.request -> int -> char Ctypes.ptr -> unit IO.t
 end
