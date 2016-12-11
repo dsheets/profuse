@@ -21,68 +21,6 @@ module Socket = Fuse.Socket(Lwt)
 
 module IO = Fuse.IO(Lwt)
 
-module Trace(F : FS_LWT) : FS_LWT with type t = F.t = struct
-  type t = F.t
-
-  let string_of_state = F.string_of_state
-
-  let string_of_nodeid = F.string_of_nodeid
-
-  let log_error = F.log_error
-
-  module Calls(IO : IO_LWT) : FS_IO_LWT with type t = t = struct
-    module Trace_IO = struct
-      type 'a t = 'a Lwt.t
-
-      let (>>=) = Lwt.(>>=)
-
-      let return = Lwt.return
-
-      let fail = Lwt.fail
-
-      let catch = Lwt.catch
-
-      module Out = struct
-        let write_reply req arrfn =
-          let arr = arrfn req in
-          let sz  = CArray.length arr + Profuse.Out.Hdr.sz in
-          let ptr = CArray.start arr -@ Profuse.Out.Hdr.sz in
-          Printf.eprintf "    returning %s from %Ld\n%!"
-            Out.Message.(describe (deserialize req sz ptr))
-            (UInt64.to_int64 (getf req.hdr Profuse.In.Hdr.T.unique));
-          Socket.write_reply_raw req sz ptr
-
-        let write_ack req =
-          Printf.eprintf "    returning ack from %Ld\n%!"
-            (Unsigned.UInt64.to_int64 (getf req.hdr Profuse.In.Hdr.T.unique));
-          IO.Out.write_ack req
-
-        let write_error log_error req err =
-          Printf.eprintf "    returning err %s from %Ld\n%!"
-            (Errno.to_string err)
-            (UInt64.to_int64 (getf req.hdr In.Hdr.T.unique));
-          IO.Out.write_error log_error req err
-      end
-
-      module In = IO.In
-    end
-
-    module Fs = F.Calls(Trace_IO)
-    module Rw_full :
-      Fuse.RW_FULL with type 'a IO.t = 'a Lwt.t and type t = F.t = Fs
-    include Rw_full
-
-    let negotiate_mount = Fs.negotiate_mount
-
-    let dispatch req t =
-      Printf.eprintf "    %s\n%!" (Profuse.In.Message.describe req);
-      Fs.dispatch req t
-      >>= fun t ->
-      Printf.eprintf "    %s\n%!" (F.string_of_state req t);
-      return t
-  end
-end
-
 (* TODO: Only depends on UNIX not LWT; we're conflating those deps for now *)
 module Dispatch(F : FS_LWT) : FS_LWT with type t = F.t = struct
   type t = F.t

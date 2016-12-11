@@ -15,8 +15,6 @@ end
 
 module IO : IO_LWT
 
-module Trace : functor (F : FS_LWT) -> FS_LWT with type t = F.t
-
 module Dispatch : functor (F : FS_LWT) -> FS_LWT with type t = F.t
 
 module type SERVER_LWT = Fuse.SERVER with type 'a IO.t = 'a Lwt.t
