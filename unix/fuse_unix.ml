@@ -116,7 +116,8 @@ module IO(IO : BASE_IO) : IO with type 'a t = 'a IO.t = struct
 end
 
 (* TODO: fix dependency on Unix for Unix_error *)
-module Dispatch(F : FS) : FS with type t = F.t = struct
+module Dispatch(F : FS)
+  : FS with type t = F.t and module Calls.IO = F.Calls.IO = struct
   type t = F.t
 
   let string_of_state = F.string_of_state
@@ -124,7 +125,7 @@ module Dispatch(F : FS) : FS with type t = F.t = struct
 
   let log_error = F.log_error
 
-  module Calls : FS_IO with type t = t = struct
+  module Calls : FS_IO with type t = t and module IO = F.Calls.IO = struct
     include F.Calls
 
     open Profuse
