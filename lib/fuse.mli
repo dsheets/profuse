@@ -4,14 +4,18 @@ module Nodes = Nodes
 type 'a structure = 'a Ctypes_static.structure
 type request = Profuse.In.Message.t Profuse.request
 
-module type IO = sig
+module type BASE_IO = sig
   type 'a t
 
-  val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
+  val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
 
   val return : 'a -> 'a t
 
   val fail : exn -> 'a t
+end
+
+module type IO = sig
+  include BASE_IO
 
   module In : sig
     val read : Profuse.chan -> unit -> request t
@@ -181,4 +185,36 @@ module Support : functor(IO : IO) -> sig
     ?attr_valid_nsec:Unsigned.uint32 ->
     ('a Nodes.node -> (Profuse.Struct.Attr.T.t structure -> unit) IO.t)
     -> 'a Nodes.node -> request -> unit IO.t
+end
+
+module Socket(IO : BASE_IO) : sig
+  type t
+
+  val new_ :
+    read:(int -> Unsigned.uint8 Ctypes.CArray.t IO.t) ->
+    write:(Unsigned.uint8 Ctypes.ptr -> int -> int IO.t) ->
+    nwrite:(Unsigned.uint8 Ctypes.ptr -> int -> int IO.t) ->
+    nread:(unit -> Unsigned.uint32 IO.t) ->
+    t
+
+  val id : t -> int
+
+  val get : int -> t
+
+  val read : t -> (int -> Unsigned.uint8 Ctypes.CArray.t IO.t)
+
+  val write : t -> (Unsigned.uint8 Ctypes.ptr -> int -> int IO.t)
+
+  val nwrite : t -> (Unsigned.uint8 Ctypes.ptr -> int -> int IO.t)
+
+  val nread : t -> Unsigned.uint32 IO.t
+
+  val set :
+    int ->
+    ?read:(int -> Unsigned.uint8 Ctypes.CArray.t IO.t) ->
+    ?write:(Unsigned.uint8 Ctypes.ptr -> int -> int IO.t) ->
+    ?nwrite:(Unsigned.uint8 Ctypes.ptr -> int -> int IO.t) ->
+    ?nread:(unit -> Unsigned.uint32 IO.t) ->
+    unit -> unit
+
 end

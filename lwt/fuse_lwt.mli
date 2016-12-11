@@ -27,32 +27,3 @@ module type MOUNT_LWT =
 
 module Server(M : MOUNT_LWT)(F : FS_LWT)(IO : IO_LWT)
   : SERVER_LWT with module IO = IO and type t = F.t
-
-type socket
-
-val new_socket :
-  read:(int -> Unsigned.uint8 Ctypes.CArray.t Lwt.t) ->
-  write:(Unsigned.uint8 Ctypes.ptr -> int -> int Lwt.t) ->
-  nwrite:(Unsigned.uint8 Ctypes.ptr -> int -> int Lwt.t) ->
-  nread:(unit -> Unsigned.uint32 Lwt.t) ->
-  socket
-
-val socket_id : socket -> int
-
-val get_socket : int -> socket
-
-val read_socket : socket -> (int -> Unsigned.uint8 Ctypes.CArray.t Lwt.t)
-
-val write_socket : socket -> (Unsigned.uint8 Ctypes.ptr -> int -> int Lwt.t)
-
-val nwrite_socket : socket -> (Unsigned.uint8 Ctypes.ptr -> int -> int Lwt.t)
-
-val nread_socket : socket -> Unsigned.uint32 Lwt.t
-
-val set_socket :
-  int ->
-  ?read:(int -> Unsigned.uint8 Ctypes.CArray.t Lwt.t) ->
-  ?write:(Unsigned.uint8 Ctypes.ptr -> int -> int Lwt.t) ->
-  ?nwrite:(Unsigned.uint8 Ctypes.ptr -> int -> int Lwt.t) ->
-  ?nread:(unit -> Unsigned.uint32 Lwt.t) ->
-  unit -> unit

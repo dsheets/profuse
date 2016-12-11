@@ -17,80 +17,13 @@ module type FS_LWT = sig
       FS_IO_LWT with type 'a IO.t = 'a IO.t and type t = t
 end
 
-type socket = {
-  id    : int;
-  read  : int -> uint8 Ctypes.CArray.t Lwt.t;
-  write : uint8 Ctypes.ptr -> int -> int Lwt.t;
-  nwrite: uint8 Ctypes.ptr -> int -> int Lwt.t;
-  nread : unit -> uint32 Lwt.t;
-}
-
-let null_socket = {
-  id = -1;
-  read  = (fun _ -> Lwt.return (Ctypes.CArray.make uint8_t 0));
-  write = (fun _ len -> Lwt.return len);
-  nwrite= (fun _ len -> Lwt.return len);
-  nread = (fun _ -> Lwt.return UInt32.zero);
-}
-
-let socket_table = ref (Array.make 0 null_socket)
-
-(* TODO: release socket *)
-let new_socket ~read ~write ~nwrite ~nread =
-  let table = !socket_table in
-  let next_id = Array.length table in
-  let table = Array.init (next_id + 1) (fun i ->
-    if i <> next_id
-    then table.(i)
-    else { id = next_id; read; write; nwrite; nread }
-  )  in
-  socket_table := table;
-  table.(next_id)
-
-let socket_id { id } = id
-
-let get_socket k =
-  (!socket_table).(k)
-
-let read_socket { read } = read
-
-let write_socket { write } = write
-
-let nwrite_socket { nwrite } = nwrite
-
-let nread_socket { nread } = nread ()
-
-let set_socket k ?read ?write ?nwrite ?nread () =
-  let table = !socket_table in
-  if k >= Array.length table
-  then raise (Invalid_argument "bad socket table index")
-  else
-    let socket = table.(k) in
-    table.(k) <- {
-      socket with
-      read = (match read with
-        | None -> socket.read
-        | Some read -> read
-      );
-      write = (match write with
-        | None -> socket.write
-        | Some write -> write
-      );
-      nwrite = (match nwrite with
-        | None -> socket.nwrite
-        | Some nwrite -> nwrite
-      );
-      nread = (match nread with
-        | None -> socket.nread
-        | Some nread -> nread
-      );
-    }
+module Socket = Fuse.Socket(Lwt)
 
 let write_notify chan arr =
   let sz = CArray.length arr + Out.Hdr.sz in
   let ptr = CArray.start arr -@ Out.Hdr.sz in
-  let socket = get_socket chan.Profuse.id in
-  socket.nwrite (coerce (Ctypes.ptr char) (Ctypes.ptr uint8_t) ptr) sz
+  let socket = Socket.get chan.Profuse.id in
+  Socket.nwrite socket (coerce (Ctypes.ptr char) (Ctypes.ptr uint8_t) ptr) sz
   >>= fun len ->
   if sz <> len
   then
@@ -101,8 +34,8 @@ let write_notify chan arr =
   else return_unit
 
 let read_notify chan =
-  let socket = get_socket chan.Profuse.id in
-  socket.nread ()
+  let socket = Socket.get chan.Profuse.id in
+  Socket.nread socket
   >>= fun err ->
   if UInt32.(compare zero err) = 0
   then Lwt.return []
@@ -112,8 +45,8 @@ let read_notify chan =
     Lwt.return (Errno.of_code ~host errno)
 
 let write_reply_raw req sz ptr =
-  let socket = get_socket req.chan.id in
-  socket.write (coerce (Ctypes.ptr char) (Ctypes.ptr uint8_t) ptr) sz
+  let socket = Socket.get req.chan.id in
+  Socket.write socket (coerce (Ctypes.ptr char) (Ctypes.ptr uint8_t) ptr) sz
   >>= fun len ->
   if sz <> len
   then
@@ -163,8 +96,8 @@ module IO : IO_LWT = struct
         catch (fun () ->
           match !remaining with
           | None ->
-            let socket = get_socket chan.Profuse.id in
-            socket.read count
+            let socket = Socket.get chan.Profuse.id in
+            Socket.read socket count
             >>= fun carray ->
             let ptr = Ctypes.CArray.start carray in
             let len = Ctypes.CArray.length carray in

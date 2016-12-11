@@ -22,7 +22,7 @@ module In = Profuse.In
 type 'a structure = 'a Ctypes_static.structure
 type request = In.Message.t Profuse.request
 
-module type IO = sig
+module type BASE_IO = sig
   type 'a t
 
   val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
@@ -30,6 +30,10 @@ module type IO = sig
   val return : 'a -> 'a t
 
   val fail : exn -> 'a t
+end
+
+module type IO = sig
+  include BASE_IO
 
   module In : sig
     val read : Profuse.chan -> unit -> request t
@@ -297,4 +301,77 @@ module Support(IO : IO) = struct
          ~attr_valid ~attr_valid_nsec
          ~store_attr)
   )
+end
+
+module Socket(IO : BASE_IO) = struct
+  open Unsigned
+
+  type t = {
+    id    : int;
+    read  : int -> uint8 Ctypes.CArray.t IO.t;
+    write : uint8 Ctypes.ptr -> int -> int IO.t;
+    nwrite: uint8 Ctypes.ptr -> int -> int IO.t;
+    nread : unit -> uint32 IO.t;
+  }
+
+  let null = {
+    id = -1;
+    read  = (fun _ -> IO.return Ctypes.(CArray.make uint8_t 0));
+    write = (fun _ len -> IO.return len);
+    nwrite= (fun _ len -> IO.return len);
+    nread = (fun _ -> IO.return UInt32.zero);
+  }
+
+  let table = ref (Array.make 0 null)
+
+  (* TODO: release socket *)
+  let new_ ~read ~write ~nwrite ~nread =
+    let tab = !table in
+    let next_id = Array.length tab in
+    let tab = Array.init (next_id + 1) (fun i ->
+      if i <> next_id
+      then tab.(i)
+      else { id = next_id; read; write; nwrite; nread }
+    )  in
+    table := tab;
+    tab.(next_id)
+
+  let id { id } = id
+
+  let get k =
+    (!table).(k)
+
+  let read { read } = read
+
+  let write { write } = write
+
+  let nwrite { nwrite } = nwrite
+
+  let nread { nread } = nread ()
+
+  let set k ?read ?write ?nwrite ?nread () =
+    let table = !table in
+    if k >= Array.length table
+    then raise (Invalid_argument "bad socket table index")
+    else
+      let socket = table.(k) in
+      table.(k) <- {
+        socket with
+        read = (match read with
+          | None -> socket.read
+          | Some read -> read
+        );
+        write = (match write with
+          | None -> socket.write
+          | Some write -> write
+        );
+        nwrite = (match nwrite with
+          | None -> socket.nwrite
+          | Some nwrite -> nwrite
+        );
+        nread = (match nread with
+          | None -> socket.nread
+          | Some nread -> nread
+        );
+      }
 end
