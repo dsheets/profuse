@@ -134,11 +134,7 @@ module type FS = sig
 
   val log_error : string -> unit
 
-  module IO : IO
-
-  module Calls :
-    functor(IO : IO with type 'a t = 'a IO.t) ->
-      FS_IO with type 'a IO.t = 'a IO.t and type t = t
+  module Calls : FS_IO with type t = t
 end
 
 module Zero :
@@ -229,3 +225,5 @@ module Socket(IO : BASE_IO) : sig
 end
 
 module IO(IO : BASE_IO) : IO with type 'a t = 'a IO.t
+
+module Dispatch(F : FS) : FS with type t = F.t

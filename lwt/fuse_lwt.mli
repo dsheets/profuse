@@ -5,9 +5,7 @@ module type FS_IO_LWT = Fuse.FS_IO with type 'a IO.t = 'a Lwt.t
 
 module IO : IO_LWT
 
-module type FS_LWT = Fuse.FS with module IO = IO
-
-module Dispatch : functor (F : FS_LWT) -> FS_LWT with type t = F.t
+module type FS_LWT = Fuse.FS with module Calls.IO = IO
 
 module type SERVER_LWT = Fuse.SERVER with type 'a IO.t = 'a Lwt.t
 
