@@ -12,6 +12,8 @@ module type BASE_IO = sig
   val return : 'a -> 'a t
 
   val fail : exn -> 'a t
+
+  val catch : (unit -> 'a t) -> (exn -> 'a t) -> 'a t
 end
 
 module type IO = sig
@@ -220,3 +222,5 @@ module Socket(IO : BASE_IO) : sig
   val write_reply_raw :
     _ Profuse.request -> int -> char Ctypes.ptr -> unit IO.t
 end
+
+module IO(IO : BASE_IO) : IO with type 'a t = 'a IO.t

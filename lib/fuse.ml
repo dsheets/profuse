@@ -30,6 +30,8 @@ module type BASE_IO = sig
   val return : 'a -> 'a t
 
   val fail : exn -> 'a t
+
+  val catch : (unit -> 'a t) -> (exn -> 'a t) -> 'a t
 end
 
 module type IO = sig
@@ -417,4 +419,118 @@ module Socket(IO : BASE_IO) = struct
       fail (Profuse.ProtocolError (req.chan,msg))
     else return ()
   )
+end
+
+(* TODO: fix the Unix dependency due to Unix_error *)
+module IO(IO : BASE_IO) : IO with type 'a t = 'a IO.t = struct
+  open Ctypes
+  open Unsigned
+  open Profuse
+
+  module Socket = Socket(IO)
+
+  type 'a t = 'a IO.t
+
+  let (>>=) = IO.(>>=)
+
+  let return = IO.return
+
+  let fail = IO.fail
+
+  let catch = IO.catch
+
+  module In = struct
+    include In
+
+    let remaining = ref None
+    let parse chan n mem =
+      let hdr_ptr = coerce (ptr uint8_t) (ptr Hdr.T.t) mem in
+      let hdr = !@ hdr_ptr in
+      chan.unique <- getf hdr Hdr.T.unique;
+      let len = UInt32.to_int (getf hdr Hdr.T.len) in
+      (if n < len
+       then (* TODO: accumulate? *)
+         let msg =
+           Printf.sprintf "Packet has %d bytes but only read %d" len n
+         in
+         fail (ProtocolError (chan, msg))
+       else if n > len
+       then (remaining := Some (n - len, mem +@ len); return ())
+       else return ()
+      ) >>= fun () ->
+      let len = len - Hdr.sz in
+      let ptr = to_voidp (mem +@ Hdr.sz) in
+      let message = Message.parse chan hdr len ptr in
+      return message
+
+    let read chan =
+      let approx_page_size = 4096 in
+      let count = chan.max_write + approx_page_size in
+      fun () ->
+        catch (fun () ->
+          match !remaining with
+          | None ->
+            let socket = Socket.get chan.Profuse.id in
+            Socket.read socket count
+            >>= fun carray ->
+            let ptr = Ctypes.CArray.start carray in
+            let len = Ctypes.CArray.length carray in
+            parse chan len ptr
+          | Some (n, mem) ->
+            remaining := None;
+            parse chan n mem
+        ) Unix.(function
+          | Unix_error ((
+            EINTR  (* SIGINT *)
+          | ENODEV (* umount *)
+          | EBADF  (* internal unmount *)
+          ), "read", _) ->
+            let nodeid = UInt64.zero in
+            let uid = UInt32.zero in
+            let gid = UInt32.zero in
+            let pid = UInt32.zero in
+            (* assumes sequentially increasing packet ids *)
+            let unique = UInt64.succ chan.Profuse.unique in
+            chan.Profuse.unique <- unique;
+            let pkt = Hdr.packet ~opcode:`FUSE_DESTROY ~unique
+                ~nodeid ~uid ~gid ~pid ~count:0
+            in
+            let hdr = !@ (coerce (ptr char) (ptr Hdr.T.t)
+                            ((CArray.start pkt) -@ Hdr.sz)) in
+            return Profuse.({ chan; hdr; pkt=Message.Destroy })
+          | Unix_error (err, call, s) ->
+            let msg =
+              Printf.sprintf "%s(%s) error: %s" call s (error_message err)
+            in
+            fail (ProtocolError (chan, msg))
+          | exn -> fail exn
+        )
+
+  end
+
+  module Out = struct
+
+    let write_reply req arrfn =
+      let arr = arrfn req in
+      let sz  = CArray.length arr + Out.Hdr.sz in
+      let ptr = CArray.start arr -@ Out.Hdr.sz in
+      Socket.write_reply_raw req sz ptr
+
+    let write_ack req = write_reply req (Out.Hdr.packet ~count:0)
+
+    let write_error log_error req err =
+      let host = req.chan.host.Host.errno in
+      let nerrno = match Errno.to_code ~host err with
+        | Some errno -> Int64.to_int32 Signed.SInt.(to_int64 (neg errno))
+        | None -> match Errno.to_code ~host Errno.EIO with
+          | Some errno ->
+            let errno_string = Errno.to_string err in
+            log_error ("Couldn't find host error code for "^errno_string);
+            Int64.to_int32 Signed.SInt.(to_int64 (neg errno))
+          | None ->
+            let errstr = Errno.to_string err in
+            failwith (Printf.sprintf "errno for %s and EIO unknown" errstr)
+      in
+      write_reply req (Out.Hdr.packet ~nerrno ~count:0)
+  end
 end
