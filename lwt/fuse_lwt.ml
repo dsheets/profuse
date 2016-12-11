@@ -7,19 +7,11 @@ module type IO_LWT = Fuse.IO with type 'a t = 'a Lwt.t
 
 module type FS_IO_LWT = Fuse.FS_IO with type 'a IO.t = 'a Lwt.t
 
-module type FS_LWT = sig
-  include Fuse.STATE
+module IO = Fuse.IO(Lwt)
 
-  val log_error : string -> unit
-
-  module Calls :
-    functor(IO : IO_LWT) ->
-      FS_IO_LWT with type 'a IO.t = 'a IO.t and type t = t
-end
+module type FS_LWT = Fuse.FS with module IO = IO
 
 module Socket = Fuse.Socket(Lwt)
-
-module IO = Fuse.IO(Lwt)
 
 (* TODO: Only depends on UNIX not LWT; we're conflating those deps for now *)
 module Dispatch(F : FS_LWT) : FS_LWT with type t = F.t = struct
@@ -29,6 +21,8 @@ module Dispatch(F : FS_LWT) : FS_LWT with type t = F.t = struct
   let string_of_nodeid = F.string_of_nodeid
 
   let log_error = F.log_error
+
+  module IO = IO
 
   module Calls(IO : IO_LWT) : FS_IO_LWT with type t = t = struct
     module Calls = F.Calls(IO)

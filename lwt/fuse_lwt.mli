@@ -3,17 +3,9 @@ module type IO_LWT = Fuse.IO with type 'a t = 'a Lwt.t
 
 module type FS_IO_LWT = Fuse.FS_IO with type 'a IO.t = 'a Lwt.t
 
-module type FS_LWT = sig
-  include Fuse.STATE
-
-  val log_error : string -> unit
-
-  module Calls :
-    functor(IO : IO_LWT) ->
-      FS_IO_LWT with type 'a IO.t = 'a IO.t and type t = t
-end
-
 module IO : IO_LWT
+
+module type FS_LWT = Fuse.FS with module IO = IO
 
 module Dispatch : functor (F : FS_LWT) -> FS_LWT with type t = F.t
 

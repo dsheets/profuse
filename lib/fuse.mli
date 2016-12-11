@@ -132,8 +132,13 @@ end
 module type FS = sig
   include STATE
 
+  val log_error : string -> unit
+
+  module IO : IO
+
   module Calls :
-    functor(IO : IO) -> FS_IO with type 'a IO.t = 'a IO.t and type t = t
+    functor(IO : IO with type 'a t = 'a IO.t) ->
+      FS_IO with type 'a IO.t = 'a IO.t and type t = t
 end
 
 module Zero :
