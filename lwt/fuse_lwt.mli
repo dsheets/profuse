@@ -7,8 +7,6 @@ module IO : IO_LWT
 
 module type FS_LWT = Fuse.FS with module Calls.IO = IO
 
-module Socket : module type of Fuse.Socket(Lwt)
-
 module type SERVER_LWT = Fuse.SERVER with type 'a IO.t = 'a Lwt.t
 
 module type MOUNT_LWT =

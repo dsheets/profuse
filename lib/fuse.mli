@@ -16,6 +16,44 @@ module type BASE_IO = sig
   val catch : (unit -> 'a t) -> (exn -> 'a t) -> 'a t
 end
 
+module type SOCKET = sig
+  type 'a io
+  type t
+  type id = private int
+
+  val new_ :
+    read:(int -> Unsigned.uint8 Ctypes.CArray.t io) ->
+    write:(Unsigned.uint8 Ctypes.ptr -> int -> int io) ->
+    nwrite:(Unsigned.uint8 Ctypes.ptr -> int -> int io) ->
+    nread:(unit -> Unsigned.uint32 io) ->
+    t
+
+  val id : t -> id
+
+  val get : id -> t
+
+  val get_int : int -> t
+
+  val read : t -> (int -> Unsigned.uint8 Ctypes.CArray.t io)
+
+  val write : t -> (Unsigned.uint8 Ctypes.ptr -> int -> int io)
+
+  val nwrite : t -> (Unsigned.uint8 Ctypes.ptr -> int -> int io)
+
+  val nread : t -> Unsigned.uint32 io
+
+  val set :
+    id ->
+    ?read:(int -> Unsigned.uint8 Ctypes.CArray.t io) ->
+    ?write:(Unsigned.uint8 Ctypes.ptr -> int -> int io) ->
+    ?nwrite:(Unsigned.uint8 Ctypes.ptr -> int -> int io) ->
+    ?nread:(unit -> Unsigned.uint32 io) ->
+    unit -> unit
+
+  val write_reply_raw :
+    _ Profuse.request -> int -> char Ctypes.ptr -> unit io
+end
+
 module type IO = sig
   include BASE_IO
 
@@ -190,36 +228,7 @@ module Support : functor(IO : IO) -> sig
     -> 'a Nodes.node -> request -> unit IO.t
 end
 
-module Socket(IO : BASE_IO) : sig
-  type t
-
-  val new_ :
-    read:(int -> Unsigned.uint8 Ctypes.CArray.t IO.t) ->
-    write:(Unsigned.uint8 Ctypes.ptr -> int -> int IO.t) ->
-    nwrite:(Unsigned.uint8 Ctypes.ptr -> int -> int IO.t) ->
-    nread:(unit -> Unsigned.uint32 IO.t) ->
-    t
-
-  val id : t -> int
-
-  val get : int -> t
-
-  val read : t -> (int -> Unsigned.uint8 Ctypes.CArray.t IO.t)
-
-  val write : t -> (Unsigned.uint8 Ctypes.ptr -> int -> int IO.t)
-
-  val nwrite : t -> (Unsigned.uint8 Ctypes.ptr -> int -> int IO.t)
-
-  val nread : t -> Unsigned.uint32 IO.t
-
-  val set :
-    int ->
-    ?read:(int -> Unsigned.uint8 Ctypes.CArray.t IO.t) ->
-    ?write:(Unsigned.uint8 Ctypes.ptr -> int -> int IO.t) ->
-    ?nwrite:(Unsigned.uint8 Ctypes.ptr -> int -> int IO.t) ->
-    ?nread:(unit -> Unsigned.uint32 IO.t) ->
-    unit -> unit
-
-  val write_reply_raw :
-    _ Profuse.request -> int -> char Ctypes.ptr -> unit IO.t
-end
+(* The result of this functor application encapsulates a stateful
+   socket table. *)
+module Socket :
+  functor (IO : BASE_IO) -> functor () -> SOCKET with type 'a io = 'a IO.t

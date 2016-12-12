@@ -2,12 +2,11 @@
 open Fuse
 
 (* TODO: fix the Unix dependency due to Unix_error *)
-module IO(IO : BASE_IO) : IO with type 'a t = 'a IO.t = struct
+module IO(IO : BASE_IO)(Socket : SOCKET with type 'a io = 'a IO.t)
+  : IO with type 'a t = 'a IO.t = struct
   open Ctypes
   open Unsigned
   open Profuse
-
-  module Socket = Socket(IO)
 
   type 'a t = 'a IO.t
 
@@ -50,7 +49,7 @@ module IO(IO : BASE_IO) : IO with type 'a t = 'a IO.t = struct
         catch (fun () ->
           match !remaining with
           | None ->
-            let socket = Socket.get chan.Profuse.id in
+            let socket = Socket.get_int chan.Profuse.id in
             Socket.read socket count
             >>= fun carray ->
             let ptr = Ctypes.CArray.start carray in

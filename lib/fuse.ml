@@ -34,6 +34,44 @@ module type BASE_IO = sig
   val catch : (unit -> 'a t) -> (exn -> 'a t) -> 'a t
 end
 
+module type SOCKET = sig
+  type 'a io
+  type t
+  type id = private int
+
+  val new_ :
+    read:(int -> Unsigned.uint8 Ctypes.CArray.t io) ->
+    write:(Unsigned.uint8 Ctypes.ptr -> int -> int io) ->
+    nwrite:(Unsigned.uint8 Ctypes.ptr -> int -> int io) ->
+    nread:(unit -> Unsigned.uint32 io) ->
+    t
+
+  val id : t -> id
+
+  val get : id -> t
+
+  val get_int : int -> t
+
+  val read : t -> (int -> Unsigned.uint8 Ctypes.CArray.t io)
+
+  val write : t -> (Unsigned.uint8 Ctypes.ptr -> int -> int io)
+
+  val nwrite : t -> (Unsigned.uint8 Ctypes.ptr -> int -> int io)
+
+  val nread : t -> Unsigned.uint32 io
+
+  val set :
+    id ->
+    ?read:(int -> Unsigned.uint8 Ctypes.CArray.t io) ->
+    ?write:(Unsigned.uint8 Ctypes.ptr -> int -> int io) ->
+    ?nwrite:(Unsigned.uint8 Ctypes.ptr -> int -> int io) ->
+    ?nread:(unit -> Unsigned.uint32 io) ->
+    unit -> unit
+
+  val write_reply_raw :
+    _ Profuse.request -> int -> char Ctypes.ptr -> unit io
+end
+
 module type IO = sig
   include BASE_IO
 
@@ -306,11 +344,15 @@ module Support(IO : IO) = struct
   )
 end
 
-module Socket(IO : BASE_IO) = struct
+module Socket(IO : BASE_IO)() : SOCKET with type 'a io = 'a IO.t = struct
   open Unsigned
 
+  type 'a io = 'a IO.t
+
+  type id = int
+
   type t = {
-    id    : int;
+    id    : id;
     read  : int -> uint8 Ctypes.CArray.t IO.t;
     write : uint8 Ctypes.ptr -> int -> int IO.t;
     nwrite: uint8 Ctypes.ptr -> int -> int IO.t;
@@ -343,6 +385,8 @@ module Socket(IO : BASE_IO) = struct
 
   let get k =
     (!table).(k)
+
+  let get_int = get
 
   let read { read } = read
 
